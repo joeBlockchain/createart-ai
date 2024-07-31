@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import SiteHeader from "@/components/site-header";
+import { useState, useEffect } from "react";
+import { useForm, SubmitHandler } from "react-hook-form";
+import Image from "next/image";
 import { Alert } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import {
@@ -12,35 +13,59 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import CreateButton from "./create-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dice1, Dices } from "lucide-react";
+import { Dices, Sprout } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { createClient } from "@/utils/supabase/client";
+
+type Inputs = {
+  prompt: string;
+};
+
+type CreateImageParams = {
+  prompt: string;
+  aspectRatio: string;
+  stylePreset: string;
+  negativePrompt: string;
+  seed: number;
+  aiImprovePrompt: boolean;
+  model: string;
+  width: number;
+  height: number;
+};
 
 export default function Create() {
-  const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [stylePreset, setStylePreset] = useState("");
+  const [currentPrompt, setCurrentPrompt] = useState("");
+
+  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [stylePreset, setStylePreset] = useState("cinematic");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [seed, setSeed] = useState<number>(0);
+  const [seed, setSeed] = useState<number | null>(null);
   const [aiImprovePrompt, setAiImprovePrompt] = useState(false);
   const [model, setModel] = useState("stable-image-core");
+  const [image, setImage] = useState("");
+  const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isStylePopoverOpen, setIsStylePopoverOpen] = useState(false);
 
-  // In the handleCreateImage function:
-  const handleCreateImage = (prompt: string) => {
-    const { width, height } = calculateDimensions(aspectRatio, model);
-    return {
-      prompt,
-      aspectRatio,
-      stylePreset: stylePreset === "none" ? "" : stylePreset,
-      negativePrompt,
-      seed,
-      aiImprovePrompt,
-      model,
-      width,
-      height,
-    };
+  const supabase = createClient();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<Inputs>();
+
+  const generateRandomSeed = () => {
+    return Math.floor(Math.random() * 4294967294);
   };
 
   const calculateDimensions = (
@@ -76,128 +101,300 @@ export default function Create() {
     return { width: newWidth, height: newHeight };
   };
 
+  const handleCreateImage = (prompt: string): CreateImageParams => {
+    const { width, height } = calculateDimensions(aspectRatio, model);
+    const finalSeed = seed !== null ? seed : generateRandomSeed();
+    setSeed(finalSeed);
+    return {
+      prompt,
+      aspectRatio,
+      stylePreset: stylePreset === "none" ? "" : stylePreset,
+      negativePrompt,
+      seed: finalSeed,
+      aiImprovePrompt,
+      model,
+      width,
+      height,
+    };
+  };
+
+  const onSubmit: SubmitHandler<Inputs> = async (data) => {
+    try {
+      setCurrentPrompt(data.prompt);
+      const params = handleCreateImage(data.prompt);
+      const res = await fetch("/api/stability-ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(params),
+      });
+      const responseData = await res.json();
+      if (responseData.image) {
+        setImage(responseData.image);
+        setError("");
+        // Auto-save the image to Supabase
+        await saveImageToSupabase(responseData.image, params.seed);
+      } else {
+        setError(responseData.error || "An error occurred");
+        setImage("");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      setError("An error occurred");
+      setImage("");
+    }
+  };
+
+  // Modify saveImageToSupabase to accept the image as a parameter
+  const saveImageToSupabase = async (imageData: string, usedSeed: number) => {
+    try {
+      setIsSaving(true);
+      // Generate a unique filename
+      const filename = `image_${Date.now()}.png`;
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error("User not authenticated");
+      }
+
+      // Upload the image to Supabase storage with user ID in the path
+      const { data, error } = await supabase.storage
+        .from("generated-images")
+        .upload(`${userId}/${filename}`, base64ToBlob(imageData), {
+          contentType: "image/png",
+        });
+
+      if (error) throw error;
+
+      // Get the public URL of the uploaded image
+      const {
+        data: { publicUrl },
+      } = supabase.storage
+        .from("generated-images")
+        .getPublicUrl(`${userId}/${filename}`);
+
+      // Save the image metadata and parameters to the database
+      const { data: savedData, error: dbError } = await supabase
+        .from("generated_images")
+        .insert({
+          user_id: userId,
+          image_url: publicUrl,
+          prompt: currentPrompt,
+          aspect_ratio: aspectRatio,
+          style_preset: stylePreset,
+          negative_prompt: negativePrompt,
+          seed: usedSeed,
+          ai_improve_prompt: aiImprovePrompt,
+          model,
+          created_at: new Date().toISOString(),
+        });
+
+      if (dbError) throw dbError;
+
+      console.log("Image saved successfully:", savedData);
+    } catch (error) {
+      console.error("Error saving image:", error);
+      setError("Failed to save image");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add this helper function to convert base64 to Blob
+  function base64ToBlob(base64: string): Blob {
+    const byteString = atob(base64.split(",")[1]);
+    const mimeString = base64.split(",")[0].split(":")[1].split(";")[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+  }
+
+  const handleStylePresetChange = (value: string) => {
+    setStylePreset(value === "none" ? "" : value);
+    setIsStylePopoverOpen(false); // Close the popover after selection
+  };
+
   return (
-    <main className="h-screen mx-5 flex flex-col">
+    <main className="h-screen mx-2 flex flex-col">
       <nav>{/* <SiteHeader /> */}</nav>
-      <div className="flex flex-row grow w-full space-x-4 mt-2">
+      <div className="flex flex-row grow w-full space-x-4 my-2">
         <div className="flex flex-col grow h-full space-y-4">
-          <CreateButton onCreateImage={handleCreateImage} />
-        </div>
-
-        <Alert className="flex-col grow h-full max-w-xs">
-          <form className="grid w-full items-start gap-6">
-            <div className="grid gap-3">
-              <Label htmlFor="model">Model</Label>
-              <Select onValueChange={(value) => setModel(value)} value={model}>
-                <SelectTrigger id="model" className="items-start">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="stable-image-core">
-                    Stable Image Core{" "}
-                    <Badge variant="secondary">$0.03 per image</Badge>
-                  </SelectItem>
-                  <SelectItem value="sd3-medium">
-                    SD3 Medium{" "}
-                    <Badge variant="secondary">$0.035 per image</Badge>
-                  </SelectItem>
-                  <SelectItem value="sd3-large-turbo">
-                    SD3 Large Turbo{" "}
-                    <Badge variant="secondary">$0.04 per image</Badge>
-                  </SelectItem>
-                  <SelectItem value="sd3-large">
-                    SD3 Large{" "}
-                    <Badge variant="secondary">$0.065 per image</Badge>
-                  </SelectItem>
-
-                  <SelectItem value="stable-image-ultra">
-                    Stable Image Ultra{" "}
-                    <Badge variant="secondary">$0.08 per image</Badge>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-3">
-              <Label htmlFor="style-preset">Style Preset</Label>
-              <Select
-                onValueChange={(value) => setStylePreset(value)}
-                value={stylePreset}
-              >
-                <SelectTrigger id="style-preset" className="items-start">
-                  <SelectValue placeholder="Select style preset" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="3d-model">3D Model</SelectItem>
-                  <SelectItem value="analog-film">Analog Film</SelectItem>
-                  <SelectItem value="anime">Anime</SelectItem>
-                  <SelectItem value="cinematic">Cinematic</SelectItem>
-                  <SelectItem value="comic-book">Comic Book</SelectItem>
-                  <SelectItem value="digital-art">Digital Art</SelectItem>
-                  <SelectItem value="enhance">Enhance</SelectItem>
-                  <SelectItem value="fantasy-art">Fantasy Art</SelectItem>
-                  <SelectItem value="isometric">Isometric</SelectItem>
-                  <SelectItem value="line-art">Line Art</SelectItem>
-                  <SelectItem value="low-poly">Low Poly</SelectItem>
-                  <SelectItem value="modeling-compound">
-                    Modeling Compound
-                  </SelectItem>
-                  <SelectItem value="neon-punk">Neon Punk</SelectItem>
-                  <SelectItem value="origami">Origami</SelectItem>
-                  <SelectItem value="photographic">Photographic</SelectItem>
-                  <SelectItem value="pixel-art">Pixel Art</SelectItem>
-                  <SelectItem value="tile-texture">Tile Texture</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-3">
-              <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
-              <Select
-                onValueChange={(value) => setAspectRatio(value)}
-                value={aspectRatio}
-              >
-                <SelectTrigger id="aspect-ratio" className="items-start">
-                  <SelectValue placeholder="Select aspect ratio" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1:1">1:1</SelectItem>
-                  <SelectItem value="16:9">16:9</SelectItem>
-                  <SelectItem value="4:3">4:3</SelectItem>
-                  <SelectItem value="2:3">2:3</SelectItem>
-                  <SelectItem value="3:2">3:2</SelectItem>
-                  <SelectItem value="4:5">4:5</SelectItem>
-                  <SelectItem value="5:4">5:4</SelectItem>
-                  <SelectItem value="9:16">9:16</SelectItem>
-                  <SelectItem value="21:9">21:9</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-3">
-              <Label htmlFor="seed">Seed</Label>
-              <div className="flex flex-row items-center justify-between gap-2">
-                <Input
-                  type="number"
-                  id="seed"
-                  min={0}
-                  max={4294967294}
-                  value={seed}
-                  onChange={(e) => setSeed(Number(e.target.value))}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  onClick={() =>
-                    setSeed(Math.floor(Math.random() * 4294967294))
-                  }
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="relative flex flex-col items-start justify-center"
+          >
+            <Popover
+              open={isStylePopoverOpen}
+              onOpenChange={setIsStylePopoverOpen}
+            >
+              <PopoverTrigger>
+                <div className="absolute h-[3.5rem] w-[4rem] top-3 left-3 border border-border rounded-lg flex flex-col items-center justify-center">
+                  <div className="text-xs font-semibold">
+                    {stylePreset || "None"}
+                  </div>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-fit">
+                <ToggleGroup
+                  type="single"
+                  value={stylePreset}
+                  onValueChange={handleStylePresetChange}
+                  className="grid grid-cols-4 gap-2 text-xs"
                 >
-                  <Dices className="w-5 h-5 flex-none" />
-                </Button>
+                  <ToggleGroupItem
+                    value="none"
+                    aria-label="None"
+                    className="w-[5rem]"
+                  >
+                    None
+                  </ToggleGroupItem>
+                  {[
+                    "3D Model",
+                    "Analog Film",
+                    "Anime",
+                    "Cinematic",
+                    "Comic Book",
+                    "Digital Art",
+                    "Fantasy Art",
+                    "Isometric",
+                    "Line Art",
+                    "Low Poly",
+                    "Modeling Compound",
+                    "Neon Punk",
+                    "Origami",
+                    "Photographic",
+                    "Pixel Art",
+                    "Tile Texture",
+                  ].map((style) => (
+                    <ToggleGroupItem
+                      key={style}
+                      value={style.toLowerCase().replace(" ", "-")}
+                      aria-label={style}
+                      className="w-[5rem]"
+                    >
+                      {style}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </PopoverContent>
+            </Popover>
+
+            <Textarea
+              {...register("prompt", { required: "Prompt is required" })}
+              placeholder="Enter prompt"
+              defaultValue="A 9 year old girl with a solemn expression sitting in a horse-drawn carriage, looking down at her feet. A nervous-looking man beside her, vast prairie landscape in the background, warm sunset colors."
+              className="w-full text-lg pr-[12rem] pl-[6rem] h-fit"
+            />
+            <div className="flex flex-row w-full justify-between mt-3">
+              <div>
+                <Select
+                  onValueChange={(value) => setModel(value)}
+                  value={model}
+                >
+                  <SelectTrigger id="model" className="items-start border-none">
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stable-image-core">
+                      Stable Image Core{" "}
+                      <Badge variant="secondary">$0.03 per image</Badge>
+                    </SelectItem>
+                    <SelectItem value="sd3-medium">
+                      SD3 Medium{" "}
+                      <Badge variant="secondary">$0.035 per image</Badge>
+                    </SelectItem>
+                    <SelectItem value="sd3-large-turbo">
+                      SD3 Large Turbo{" "}
+                      <Badge variant="secondary">$0.04 per image</Badge>
+                    </SelectItem>
+                    <SelectItem value="sd3-large">
+                      SD3 Large{" "}
+                      <Badge variant="secondary">$0.065 per image</Badge>
+                    </SelectItem>
+                    <SelectItem value="stable-image-ultra">
+                      Stable Image Ultra{" "}
+                      <Badge variant="secondary">$0.08 per image</Badge>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <div className="flex flex-row items-center justify-between gap-2">
+                  <Sprout className="w-5 h-5 flex-none" />
+                  <Input
+                    type="number"
+                    id="seed"
+                    min={0}
+                    max={4294967294}
+                    value={seed !== null ? seed : ""}
+                    onChange={(e) => setSeed(Number(e.target.value))}
+                    placeholder="Random"
+                    className="border-none"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setSeed(Math.floor(Math.random() * 4294967294))
+                    }
+                  >
+                    <Dices className="w-5 h-5 flex-none" />
+                  </Button>
+                </div>
               </div>
             </div>
+
+            <div className="absolute right-3 top-3 flex space-x-2">
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={isSubmitting || isSaving}
+              >
+                {isSubmitting ? (
+                  <span
+                    className="loader"
+                    style={
+                      {
+                        "--loader-size": "18px",
+                        "--loader-color": "#000",
+                        "--loader-color-dark": "#fff",
+                      } as React.CSSProperties
+                    }
+                  ></span>
+                ) : (
+                  "Create"
+                )}
+              </Button>
+            </div>
+          </form>
+          {errors.prompt && (
+            <p className="text-red-500 mt-2">{errors.prompt.message}</p>
+          )}
+          <div className="flex h-full grow overflow-auto mt-4">
+            {image ? (
+              <ResponsiveImage image={image} aspectRatio={aspectRatio} />
+            ) : (
+              <AspectRatioPreview
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+              />
+            )}
+            {error && <p className="text-red-500">{error}</p>}
+          </div>
+        </div>
+
+        {/* <Alert className="flex-col grow h-full max-w-xs">
+          <form className="grid w-full items-start gap-6">
             <div className="grid gap-3">
-              <Label htmlFor="negative-prompt">Negative Prompt</Label>
+              <Label htmlFor="negative-prompt">Exclude</Label>
               <Textarea
                 id="negative-prompt"
                 value={negativePrompt}
@@ -205,17 +402,142 @@ export default function Create() {
                 placeholder="Enter what you don't want to see in the image"
               />
             </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="ai-improve-prompt">AI Improve Prompt</Label>
-              <Switch
-                id="ai-improve-prompt"
-                checked={aiImprovePrompt}
-                onCheckedChange={setAiImprovePrompt}
-              />
-            </div>
           </form>
-        </Alert>
+        </Alert> */}
       </div>
     </main>
   );
 }
+
+const AspectRatioPreview = ({
+  aspectRatio,
+  setAspectRatio,
+}: {
+  aspectRatio: string;
+  setAspectRatio: (value: string) => void;
+}) => {
+  const [width, height] = aspectRatio.split(":").map(Number);
+  const ratio = width / height;
+  const [maxSize, setMaxSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const updateMaxSize = () => {
+      const containerWidth = window.innerWidth * 0.7; // Adjust this multiplier as needed
+      const containerHeight = window.innerHeight * 0.7; // Adjust this multiplier as needed
+
+      if (containerWidth / ratio > containerHeight) {
+        // Height constrained
+        setMaxSize({ width: containerHeight * ratio, height: containerHeight });
+      } else {
+        // Width constrained
+        setMaxSize({ width: containerWidth, height: containerWidth / ratio });
+      }
+    };
+
+    updateMaxSize();
+    window.addEventListener("resize", updateMaxSize);
+    return () => window.removeEventListener("resize", updateMaxSize);
+  }, [ratio]);
+
+  return (
+    <div className="w-full h-full flex items-center justify-center p-4">
+      <div
+        style={{
+          width: `${maxSize.width}px`,
+          height: `${maxSize.height}px`,
+          maxWidth: "100%",
+          maxHeight: "100%",
+        }}
+        className="relative flex items-center justify-center border-2 border-dashed border-border rounded-lg"
+      >
+        <ToggleGroup
+          type="single"
+          className="w-fit grid grid-cols-3 text-muted-foreground"
+          value={aspectRatio}
+          onValueChange={setAspectRatio}
+        >
+          <ToggleGroupItem value="21:9" aria-label="21:9">
+            21:9
+          </ToggleGroupItem>
+          <ToggleGroupItem value="16:9" aria-label="16:9">
+            16:9
+          </ToggleGroupItem>
+          <ToggleGroupItem value="3:2" aria-label="3:2">
+            3:2
+          </ToggleGroupItem>
+
+          <ToggleGroupItem value="4:3" aria-label="4:3">
+            4:3
+          </ToggleGroupItem>
+          <ToggleGroupItem value="5:4" aria-label="5:4">
+            5:4
+          </ToggleGroupItem>
+          <ToggleGroupItem value="1:1" aria-label="1:1">
+            1:1
+          </ToggleGroupItem>
+          <ToggleGroupItem value="4:5" aria-label="4:5">
+            4:5
+          </ToggleGroupItem>
+
+          <ToggleGroupItem value="2:3" aria-label="2:3">
+            2:3
+          </ToggleGroupItem>
+
+          <ToggleGroupItem value="9:16" aria-label="9:16">
+            9:16
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+    </div>
+  );
+};
+
+const ResponsiveImage = ({
+  image,
+  aspectRatio,
+}: {
+  image: string;
+  aspectRatio: string;
+}) => {
+  const [width, height] = aspectRatio.split(":").map(Number);
+  const ratio = width / height;
+  const [maxSize, setMaxSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const updateMaxSize = () => {
+      const containerWidth = window.innerWidth * 0.7;
+      const containerHeight = window.innerHeight * 0.7;
+
+      if (containerWidth / ratio > containerHeight) {
+        setMaxSize({ width: containerHeight * ratio, height: containerHeight });
+      } else {
+        setMaxSize({ width: containerWidth, height: containerWidth / ratio });
+      }
+    };
+
+    updateMaxSize();
+    window.addEventListener("resize", updateMaxSize);
+    return () => window.removeEventListener("resize", updateMaxSize);
+  }, [ratio]);
+
+  return (
+    <div className="w-full h-full flex items-center justify-center p-4">
+      <div
+        style={{
+          width: `${maxSize.width}px`,
+          height: `${maxSize.height}px`,
+          maxWidth: "100%",
+          maxHeight: "100%",
+        }}
+        className="relative flex items-center justify-center rounded-lg overflow-hidden"
+      >
+        <Image
+          src={image}
+          alt="Generated image"
+          layout="fill"
+          objectFit="contain"
+        />
+      </div>
+    </div>
+  );
+};

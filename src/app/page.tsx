@@ -1,8 +1,18 @@
 import SiteHeader from "@/components/site-header";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/utils/supabase/server";
 
 export default async function Home() {
+  const supabase = createClient();
+
+  const user = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/create");
+  }
+
   return (
     <main className="h-screen mx-5">
       <nav className="">

@@ -55,6 +55,7 @@ const getToastRedirect = (
     redirectPath += `&${arbitraryParams}`;
   }
 
+  console.log("redirectPath", redirectPath);
   return redirectPath;
 };
 
