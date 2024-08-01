@@ -30,6 +30,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createClient } from "@/utils/supabase/client";
 import { Label } from "@/components/ui/label";
+import { useInView } from "react-intersection-observer";
 
 type Inputs = {
   prompt: string;
@@ -46,6 +47,18 @@ type CreateImageParams = {
   width: number;
   height: number;
 };
+
+interface GeneratedImage {
+  id: string;
+  image_url: string;
+  prompt: string;
+  aspect_ratio: string;
+  style_preset: string;
+  negative_prompt: string;
+  seed: number;
+  ai_improve_prompt: boolean;
+  model: string;
+}
 
 export default function Create() {
   const [currentPrompt, setCurrentPrompt] = useState("");
@@ -65,6 +78,7 @@ export default function Create() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<Inputs>();
 
@@ -227,6 +241,19 @@ export default function Create() {
     setIsStylePopoverOpen(false); // Close the popover after selection
   };
 
+  const handleImageSelect = (selectedImage: GeneratedImage) => {
+    console.log("selectedImage", selectedImage);
+    setImage(selectedImage.image_url);
+    setValue("prompt", selectedImage.prompt); // Update the form field
+    setCurrentPrompt(selectedImage.prompt);
+    setAspectRatio(selectedImage.aspect_ratio);
+    setStylePreset(selectedImage.style_preset);
+    setNegativePrompt(selectedImage.negative_prompt);
+    setSeed(selectedImage.seed);
+    setAiImprovePrompt(selectedImage.ai_improve_prompt);
+    setModel(selectedImage.model);
+  };
+
   return (
     <main className="flex flex-col h-full grow mx-2 ">
       <div className="flex flex-row grow w-full space-x-4 my-2">
@@ -294,7 +321,7 @@ export default function Create() {
             <Textarea
               {...register("prompt", { required: "Prompt is required" })}
               placeholder="Enter prompt"
-              defaultValue="A 9 year old girl with a solemn expression sitting in a horse-drawn carriage, looking down at her feet. A nervous-looking man beside her, vast prairie landscape in the background, warm sunset colors."
+              defaultValue="A white camellia flower, lots  of petals in rich pattern. Light shines through the petal patterns, tilted at an angle. Dark background. The soft edges of this flower create beautiful curves, enhancing the overall aesthetic appeal. The background color seamlessly blends with the colors of various flower petals, creating a warm atmosphere."
               className="w-full text-lg pr-[6rem] pl-[6rem] h-fit"
             />
             <div className="flex flex-row w-full justify-between mt-3">
@@ -411,16 +438,21 @@ export default function Create() {
           {errors.prompt && (
             <p className="text-red-500 mt-2">{errors.prompt.message}</p>
           )}
-          <div className="flex h-full grow overflow-auto">
-            {image ? (
-              <ResponsiveImage image={image} aspectRatio={aspectRatio} />
-            ) : (
-              <AspectRatioPreview
-                aspectRatio={aspectRatio}
-                setAspectRatio={setAspectRatio}
-              />
-            )}
-            {error && <p className="text-red-500">{error}</p>}
+          <div className="flex flex-row h-full grow">
+            <div className="flex h-full grow overflow-auto">
+              {image ? (
+                <ResponsiveImage image={image} aspectRatio={aspectRatio} />
+              ) : (
+                <AspectRatioPreview
+                  aspectRatio={aspectRatio}
+                  setAspectRatio={setAspectRatio}
+                />
+              )}
+              {error && <p className="text-red-500">{error}</p>}
+            </div>
+            <div className="max-h-[80vh] overflow-y-auto">
+              <ImageHistory onImageSelect={handleImageSelect} />
+            </div>
           </div>
         </div>
 
@@ -577,31 +609,117 @@ const ResponsiveImage = ({
             <Button variant="outline" size="icon" className="">
               <ImageOff className="w-6 h-6" strokeWidth={1} />
             </Button>
-            <Label>Remove Background</Label>
+            <Label className="hidden md:block">Remove Background</Label>
           </div>
 
           <div className="flex flex-row items-center gap-2">
             <Button variant="outline" size="icon" className="">
               <Replace className="w-6 h-6" strokeWidth={1} />
             </Button>
-            <Label>Search and Replace</Label>
+            <Label className="hidden md:block">Search and Replace</Label>
           </div>
 
           <div className="flex flex-row items-center gap-2">
             <Button variant="outline" size="icon" className="">
               <Eraser className="w-6 h-6" strokeWidth={1} />
             </Button>
-            <Label>Erase Object</Label>
+            <Label className="hidden md:block">Erase Object</Label>
           </div>
 
           <div className="flex flex-row items-center gap-2">
             <Button variant="outline" size="icon" className="">
               <Maximize2 className="w-6 h-6" strokeWidth={1} />
             </Button>
-            <Label>Outpaint</Label>
+            <Label className="hidden md:block">Outpaint</Label>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+function ImageHistory({
+  onImageSelect,
+}: {
+  onImageSelect: (image: GeneratedImage) => void;
+}) {
+  const [images, setImages] = useState<GeneratedImage[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const { ref, inView } = useInView();
+
+  const fetchImages = async () => {
+    const supabase = createClient();
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setError("User not authenticated");
+        return;
+      }
+
+      const limit = 10; // Number of images per page
+      const { data, error } = await supabase
+        .from("generated_images")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.length < limit) {
+        setHasMore(false);
+      }
+
+      setImages((prevImages) => [...prevImages, ...(data as GeneratedImage[])]);
+      setPage((prevPage) => prevPage + 1);
+    } catch (err) {
+      console.error("Error fetching images:", err);
+      setError("Error loading images");
+    }
+  };
+
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  useEffect(() => {
+    if (inView && hasMore) {
+      fetchImages();
+    }
+  }, [inView, hasMore]);
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-2 overflow-y-auto">
+      <div className="grid grid-cols-1 gap-2">
+        {images.map((image) => (
+          <div
+            key={image.id}
+            className="border rounded-lg overflow-hidden cursor-pointer"
+            onClick={() => onImageSelect(image)}
+          >
+            <Image
+              src={`${image.image_url}?width=100`} // Request a smaller version
+              alt={image.prompt}
+              width={50}
+              height={50}
+              className="w-fit object-cover"
+            />
+          </div>
+        ))}
+        {hasMore && <div ref={ref}>Loading more...</div>}
+      </div>
+    </div>
+  );
+}
