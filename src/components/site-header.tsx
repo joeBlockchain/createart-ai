@@ -14,7 +14,7 @@ export default function SiteHeader() {
           prefetch={false}
         >
           <Image className="h-6 w-6" />
-          <span className="ml-4 font-semibold text-base sm:text-lg">
+          <span className="hidden md:block ml-4 font-semibold text-base sm:text-lg">
             CreateArt-AI
           </span>
         </Link>

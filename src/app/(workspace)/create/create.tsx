@@ -21,6 +21,7 @@ import {
   Replace,
   Eraser,
   Maximize2,
+  ChevronRight,
 } from "lucide-react";
 import {
   Popover,
@@ -31,6 +32,15 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createClient } from "@/utils/supabase/client";
 import { Label } from "@/components/ui/label";
 import { useInView } from "react-intersection-observer";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 type Inputs = {
   prompt: string;
@@ -338,12 +348,12 @@ export default function Create() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="stable-image-core">
-                      Stable Image Core{" "}
+                      SD Core{" "}
                       <Badge
                         variant="outline"
                         className="text-muted-foreground"
                       >
-                        $0.03 per image
+                        $0.03 / image
                       </Badge>
                     </SelectItem>
                     <SelectItem value="sd3-medium">
@@ -352,16 +362,16 @@ export default function Create() {
                         variant="outline"
                         className="text-muted-foreground"
                       >
-                        $0.035 per image
+                        $0.035 / image
                       </Badge>
                     </SelectItem>
                     <SelectItem value="sd3-large-turbo">
-                      SD3 Large Turbo{" "}
+                      SD3 Turbo{" "}
                       <Badge
                         variant="outline"
                         className="text-muted-foreground"
                       >
-                        $0.04 per image
+                        $0.04 / image
                       </Badge>
                     </SelectItem>
                     <SelectItem value="sd3-large">
@@ -370,16 +380,16 @@ export default function Create() {
                         variant="outline"
                         className="text-muted-foreground"
                       >
-                        $0.065 per image
+                        $0.065 / image
                       </Badge>
                     </SelectItem>
                     <SelectItem value="stable-image-ultra">
-                      Stable Image Ultra{" "}
+                      SD Ultra{" "}
                       <Badge
                         variant="outline"
                         className="text-muted-foreground"
                       >
-                        $0.08 per image
+                        $0.08 / image
                       </Badge>
                     </SelectItem>
                   </SelectContent>
@@ -603,7 +613,7 @@ const ResponsiveImage = ({
           objectFit="contain"
         />
       </div>
-      {/* <div className="absolute top-4 left-4 ">
+      <div className="absolute top-4 left-4 ">
         <div className="flex flex-col items-start gap-2">
           <div className="flex flex-row items-center gap-2">
             <Button variant="outline" size="icon" className="">
@@ -633,7 +643,7 @@ const ResponsiveImage = ({
             <Label className="hidden md:block">Outpaint</Label>
           </div>
         </div>
-      </div> */}
+      </div>
     </div>
   );
 };
@@ -701,25 +711,75 @@ function ImageHistory({
   }
 
   return (
-    <div className="flex flex-col items-start gap-2 overflow-y-auto">
-      <div className="grid grid-cols-1 gap-2">
-        {images.map((image) => (
-          <div
-            key={image.id}
-            className="border rounded-lg overflow-hidden cursor-pointer"
-            onClick={() => onImageSelect(image)}
-          >
-            <Image
-              src={`${image.image_url}?width=100`} // Request a smaller version
-              alt={image.prompt}
-              width={50}
-              height={50}
-              className="w-fit object-cover"
-            />
-          </div>
-        ))}
-        {hasMore && <div ref={ref}>Loading more...</div>}
+    <>
+      {/* Desktop view */}
+      <div className="hidden md:flex flex-col items-start gap-2 overflow-y-auto">
+        <div className="grid grid-cols-1 gap-2">
+          {images.map((image) => (
+            <div
+              key={image.id}
+              className="border rounded-lg overflow-hidden cursor-pointer"
+              onClick={() => onImageSelect(image)}
+            >
+              <Image
+                src={`${image.image_url}?width=100`}
+                alt={image.prompt}
+                width={50}
+                height={50}
+                className="w-fit object-cover"
+              />
+            </div>
+          ))}
+          {hasMore && <div ref={ref}>Loading more...</div>}
+        </div>
       </div>
-    </div>
+
+      {/* Mobile view */}
+      <div className="">
+        <Sheet>
+          <SheetTrigger asChild className="absolute top-[10rem] right-[0rem]">
+            <Button
+              variant="outline"
+              className="md:hidden rounded-l-full w-10 p-0 mt-10"
+            >
+              <ChevronRight className="w-6 h-6 text-muted-foreground" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right">
+            <SheetHeader>
+              <SheetTitle>Generated Images</SheetTitle>
+              <SheetDescription>
+                Your previously generated images
+              </SheetDescription>
+            </SheetHeader>
+            <div className="flex flex-col items-start gap-2 overflow-y-auto mt-4">
+              <div className="grid grid-cols-1 gap-2">
+                {images.map((image) => (
+                  <div
+                    key={image.id}
+                    className="border rounded-lg overflow-hidden cursor-pointer"
+                    onClick={() => {
+                      onImageSelect(image);
+                      // Close the sheet after selection
+                      const closeEvent = new Event("close-sheet");
+                      window.dispatchEvent(closeEvent);
+                    }}
+                  >
+                    <Image
+                      src={`${image.image_url}?width=100`}
+                      alt={image.prompt}
+                      width={50}
+                      height={50}
+                      className="w-fit object-cover"
+                    />
+                  </div>
+                ))}
+                {hasMore && <div ref={ref}>Loading more...</div>}
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
   );
 }
