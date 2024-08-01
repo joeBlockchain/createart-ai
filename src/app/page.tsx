@@ -5,7 +5,7 @@ import SiteFooter from "@/components/site-footer";
 
 export default async function Home() {
   return (
-    <main className="h-screen mx-5">
+    <main className="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
       <nav className="">
         <SiteHeader />
       </nav>
