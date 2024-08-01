@@ -603,7 +603,7 @@ const ResponsiveImage = ({
           objectFit="contain"
         />
       </div>
-      <div className="absolute top-4 left-4 ">
+      {/* <div className="absolute top-4 left-4 ">
         <div className="flex flex-col items-start gap-2">
           <div className="flex flex-row items-center gap-2">
             <Button variant="outline" size="icon" className="">
@@ -633,7 +633,7 @@ const ResponsiveImage = ({
             <Label className="hidden md:block">Outpaint</Label>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };
