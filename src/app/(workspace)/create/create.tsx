@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import Image from "next/image";
-import { Alert } from "@/components/ui/alert";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -12,12 +10,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dices, Sprout } from "lucide-react";
+import {
+  Dices,
+  Sprout,
+  ImageOff,
+  Replace,
+  Eraser,
+  Maximize2,
+} from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -45,7 +49,7 @@ type CreateImageParams = {
 export default function Create() {
   const [currentPrompt, setCurrentPrompt] = useState("");
 
-  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [aspectRatio, setAspectRatio] = useState("1:1");
   const [stylePreset, setStylePreset] = useState("cinematic");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [seed, setSeed] = useState<number | null>(null);
@@ -105,6 +109,7 @@ export default function Create() {
     const { width, height } = calculateDimensions(aspectRatio, model);
     const finalSeed = seed !== null ? seed : generateRandomSeed();
     setSeed(finalSeed);
+    setCurrentPrompt(prompt);
     return {
       prompt,
       aspectRatio,
@@ -191,7 +196,8 @@ export default function Create() {
           ai_improve_prompt: aiImprovePrompt,
           model,
           created_at: new Date().toISOString(),
-        });
+        })
+        .select();
 
       if (dbError) throw dbError;
 
@@ -222,8 +228,7 @@ export default function Create() {
   };
 
   return (
-    <main className="h-screen mx-2 flex flex-col">
-      <nav>{/* <SiteHeader /> */}</nav>
+    <main className="flex flex-col h-full grow mx-2 ">
       <div className="flex flex-row grow w-full space-x-4 my-2">
         <div className="flex flex-col grow h-full space-y-4">
           <form
@@ -290,7 +295,7 @@ export default function Create() {
               {...register("prompt", { required: "Prompt is required" })}
               placeholder="Enter prompt"
               defaultValue="A 9 year old girl with a solemn expression sitting in a horse-drawn carriage, looking down at her feet. A nervous-looking man beside her, vast prairie landscape in the background, warm sunset colors."
-              className="w-full text-lg pr-[12rem] pl-[6rem] h-fit"
+              className="w-full text-lg pr-[6rem] pl-[6rem] h-fit"
             />
             <div className="flex flex-row w-full justify-between mt-3">
               <div>
@@ -298,35 +303,63 @@ export default function Create() {
                   onValueChange={(value) => setModel(value)}
                   value={model}
                 >
-                  <SelectTrigger id="model" className="items-start border-none">
+                  <SelectTrigger
+                    id="model"
+                    className="items-start border-none text-muted-foreground focus:outline-none focus:ring-0 p-0 m-0 h-fit"
+                  >
                     <SelectValue placeholder="Select model" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="stable-image-core">
                       Stable Image Core{" "}
-                      <Badge variant="secondary">$0.03 per image</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
+                        $0.03 per image
+                      </Badge>
                     </SelectItem>
                     <SelectItem value="sd3-medium">
                       SD3 Medium{" "}
-                      <Badge variant="secondary">$0.035 per image</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
+                        $0.035 per image
+                      </Badge>
                     </SelectItem>
                     <SelectItem value="sd3-large-turbo">
                       SD3 Large Turbo{" "}
-                      <Badge variant="secondary">$0.04 per image</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
+                        $0.04 per image
+                      </Badge>
                     </SelectItem>
                     <SelectItem value="sd3-large">
                       SD3 Large{" "}
-                      <Badge variant="secondary">$0.065 per image</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
+                        $0.065 per image
+                      </Badge>
                     </SelectItem>
                     <SelectItem value="stable-image-ultra">
                       Stable Image Ultra{" "}
-                      <Badge variant="secondary">$0.08 per image</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
+                        $0.08 per image
+                      </Badge>
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <div className="flex flex-row items-center justify-between gap-2">
+                <div className="flex flex-row items-center justify-between gap-2 text-muted-foreground">
                   <Sprout className="w-5 h-5 flex-none" />
                   <Input
                     type="number"
@@ -336,15 +369,15 @@ export default function Create() {
                     value={seed !== null ? seed : ""}
                     onChange={(e) => setSeed(Number(e.target.value))}
                     placeholder="Random"
-                    className="border-none"
+                    className="border-none focus:outline-none focus:ring-0 p-0 m-0 h-fit w-fit"
                   />
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
                     onClick={() =>
                       setSeed(Math.floor(Math.random() * 4294967294))
                     }
+                    className="p-0 m-0 h-fit"
                   >
                     <Dices className="w-5 h-5 flex-none" />
                   </Button>
@@ -370,7 +403,7 @@ export default function Create() {
                     }
                   ></span>
                 ) : (
-                  "Create"
+                  "New"
                 )}
               </Button>
             </div>
@@ -378,7 +411,7 @@ export default function Create() {
           {errors.prompt && (
             <p className="text-red-500 mt-2">{errors.prompt.message}</p>
           )}
-          <div className="flex h-full grow overflow-auto mt-4">
+          <div className="flex h-full grow overflow-auto">
             {image ? (
               <ResponsiveImage image={image} aspectRatio={aspectRatio} />
             ) : (
@@ -440,7 +473,7 @@ const AspectRatioPreview = ({
   }, [ratio]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-4">
+    <div className="w-full h-full flex items-center justify-center">
       <div
         style={{
           width: `${maxSize.width}px`,
@@ -521,7 +554,7 @@ const ResponsiveImage = ({
   }, [ratio]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-4">
+    <div className="relative w-full h-full flex items-center justify-center p-4">
       <div
         style={{
           width: `${maxSize.width}px`,
@@ -537,6 +570,26 @@ const ResponsiveImage = ({
           layout="fill"
           objectFit="contain"
         />
+      </div>
+      <div className="absolute top-4 left-4 ">
+        <div className="flex flex-col items-center gap-2">
+          <Button variant="outline" size="icon" className="">
+            <ImageOff className="w-6 h-6" strokeWidth={1} />
+          </Button>
+          Remove Background
+          <Button variant="outline" size="icon" className="">
+            <Replace className="w-6 h-6" strokeWidth={1} />
+          </Button>
+          Search and Replace
+          <Button variant="outline" size="icon" className="">
+            <Eraser className="w-6 h-6" strokeWidth={1} />
+          </Button>
+          Erase Object
+          <Button variant="outline" size="icon" className="">
+            <Maximize2 className="w-6 h-6" strokeWidth={1} />
+          </Button>
+          Outpaint
+        </div>
       </div>
     </div>
   );

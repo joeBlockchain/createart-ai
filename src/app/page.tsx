@@ -1,18 +1,9 @@
 import SiteHeader from "@/components/site-header";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/utils/supabase/server";
+import SiteFooter from "@/components/site-footer";
 
 export default async function Home() {
-  const supabase = createClient();
-
-  const user = await supabase.auth.getUser();
-
-  if (user) {
-    redirect("/create");
-  }
-
   return (
     <main className="h-screen mx-5">
       <nav className="">
@@ -36,7 +27,8 @@ export default async function Home() {
                 variant="default"
                 className="mx-3 w-40 text-lg h-12 lg:h-14 lg:rounded-lg lg:text-xl"
               >
-                <Link href="/signin/password_signin">Get Started</Link>
+                {/* <Link href="/signin/password_signin">Get Started</Link> */}
+                <Link href="/create">Create!</Link>
               </Button>
               <Button
                 asChild
@@ -49,37 +41,7 @@ export default async function Home() {
           </div>
         </div>
       </section>
-      <footer className="w-full py-6 bg-background fixed bottom-0 left-0 right-0">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <p className="text-sm text-muted-foreground">
-                © 2024 CreateArt-AI. All rights reserved.
-              </p>
-            </div>
-            <nav className="flex space-x-4">
-              <Link
-                href="/privacy-policy"
-                className="text-sm text-muted-foreground hover:text-primary"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href="/terms-of-service"
-                className="text-sm text-muted-foreground hover:text-primary"
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="/contact"
-                className="text-sm text-muted-foreground hover:text-primary"
-              >
-                Contact Us
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

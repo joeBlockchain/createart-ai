@@ -1,7 +1,7 @@
 -- Create the generated_images table
 CREATE TABLE generated_images (
     id BIGSERIAL PRIMARY KEY,
-    user_id TEXT NOT NULL,
+    user_id UUID NOT NULL,
     image_url TEXT NOT NULL,
     prompt TEXT NOT NULL,
     aspect_ratio TEXT NOT NULL,
@@ -10,7 +10,8 @@ CREATE TABLE generated_images (
     seed BIGINT NOT NULL,
     ai_improve_prompt BOOLEAN NOT NULL,
     model TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 
 -- Create an index on the created_at column for faster querying
@@ -23,22 +24,22 @@ ALTER TABLE generated_images ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can insert their own images"
 ON generated_images FOR INSERT
 TO authenticated
-WITH CHECK (auth.uid() = auth.uid());
+WITH CHECK (auth.uid() = user_id);
 
 -- Create a policy that allows users to select only their own records
 CREATE POLICY "Users can view their own images"
 ON generated_images FOR SELECT
 TO authenticated
-USING (auth.uid() = auth.uid());
+USING (auth.uid() = user_id);
 
 -- Optional: Create a policy that allows users to update their own records
 CREATE POLICY "Users can update their own images"
 ON generated_images FOR UPDATE
 TO authenticated
-USING (auth.uid() = auth.uid());
+USING (auth.uid() = user_id);
 
 -- Optional: Create a policy that allows users to delete their own records
 CREATE POLICY "Users can delete their own images"
 ON generated_images FOR DELETE
 TO authenticated
-USING (auth.uid() = auth.uid());
+USING (auth.uid() = user_id);
