@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createClient } from "@/utils/supabase/client";
+import { Label } from "@/components/ui/label";
 
 type Inputs = {
   prompt: string;
@@ -48,7 +49,6 @@ type CreateImageParams = {
 
 export default function Create() {
   const [currentPrompt, setCurrentPrompt] = useState("");
-
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [stylePreset, setStylePreset] = useState("cinematic");
   const [negativePrompt, setNegativePrompt] = useState("");
@@ -151,7 +151,6 @@ export default function Create() {
     }
   };
 
-  // Modify saveImageToSupabase to accept the image as a parameter
   const saveImageToSupabase = async (imageData: string, usedSeed: number) => {
     try {
       setIsSaving(true);
@@ -162,6 +161,7 @@ export default function Create() {
         data: { user },
       } = await supabase.auth.getUser();
       const userId = user?.id;
+
       if (!userId) {
         throw new Error("User not authenticated");
       }
@@ -572,23 +572,34 @@ const ResponsiveImage = ({
         />
       </div>
       <div className="absolute top-4 left-4 ">
-        <div className="flex flex-col items-center gap-2">
-          <Button variant="outline" size="icon" className="">
-            <ImageOff className="w-6 h-6" strokeWidth={1} />
-          </Button>
-          Remove Background
-          <Button variant="outline" size="icon" className="">
-            <Replace className="w-6 h-6" strokeWidth={1} />
-          </Button>
-          Search and Replace
-          <Button variant="outline" size="icon" className="">
-            <Eraser className="w-6 h-6" strokeWidth={1} />
-          </Button>
-          Erase Object
-          <Button variant="outline" size="icon" className="">
-            <Maximize2 className="w-6 h-6" strokeWidth={1} />
-          </Button>
-          Outpaint
+        <div className="flex flex-col items-start gap-2">
+          <div className="flex flex-row items-center gap-2">
+            <Button variant="outline" size="icon" className="">
+              <ImageOff className="w-6 h-6" strokeWidth={1} />
+            </Button>
+            <Label>Remove Background</Label>
+          </div>
+
+          <div className="flex flex-row items-center gap-2">
+            <Button variant="outline" size="icon" className="">
+              <Replace className="w-6 h-6" strokeWidth={1} />
+            </Button>
+            <Label>Search and Replace</Label>
+          </div>
+
+          <div className="flex flex-row items-center gap-2">
+            <Button variant="outline" size="icon" className="">
+              <Eraser className="w-6 h-6" strokeWidth={1} />
+            </Button>
+            <Label>Erase Object</Label>
+          </div>
+
+          <div className="flex flex-row items-center gap-2">
+            <Button variant="outline" size="icon" className="">
+              <Maximize2 className="w-6 h-6" strokeWidth={1} />
+            </Button>
+            <Label>Outpaint</Label>
+          </div>
         </div>
       </div>
     </div>
