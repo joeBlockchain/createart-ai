@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Style Preset only works with Stable Image Core
-    if (model === "stable-image-core") {
+    if (model === "stable-image-core" && stylePreset) {
       payload.append("style_preset", stylePreset);
     }
 

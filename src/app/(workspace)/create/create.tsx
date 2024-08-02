@@ -51,6 +51,47 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
+import NoneExampleStyle from "@/public/style-presets/none.webp";
+import AnimeExampleStyle from "@/public/style-presets/anime.webp";
+import CinematicExampleStyle from "@/public/style-presets/cinematic.webp";
+import DigitalArtExampleStyle from "@/public/style-presets/digital-art.webp";
+import FantasyArtExampleStyle from "@/public/style-presets/fantasy-art.webp";
+import ThreeDModelExampleStyle from "@/public/style-presets/3d-model.webp";
+import AnalogFilmExampleStyle from "@/public/style-presets/analog-film.webp";
+import ComicBookExampleStyle from "@/public/style-presets/comic-book.webp";
+import IsometricExampleStyle from "@/public/style-presets/isometric.webp";
+import LineArtExampleStyle from "@/public/style-presets/line-art.webp";
+import LowPolyExampleStyle from "@/public/style-presets/low-poly.webp";
+import ModelingCompoundExampleStyle from "@/public/style-presets/modeling-compound.webp";
+import NeonPunkExampleStyle from "@/public/style-presets/neon-punk.webp";
+import OrigamiExampleStyle from "@/public/style-presets/origami.webp";
+import PhotographicExampleStyle from "@/public/style-presets/photographic.webp";
+import PixelArtExampleStyle from "@/public/style-presets/pixel-art.webp";
+import TileTextureExampleStyle from "@/public/style-presets/tile-texture.webp";
+import EnhanceExampleStyle from "@/public/style-presets/enhance.webp";
+
+const stylePresetExamples = {
+  none: NoneExampleStyle,
+  anime: AnimeExampleStyle,
+  cinematic: CinematicExampleStyle,
+  "digital-art": DigitalArtExampleStyle,
+  "fantasy-art": FantasyArtExampleStyle,
+  "3d-model": ThreeDModelExampleStyle,
+  "analog-film": AnalogFilmExampleStyle,
+  "comic-book": ComicBookExampleStyle,
+  isometric: IsometricExampleStyle,
+  "line-art": LineArtExampleStyle,
+  "low-poly": LowPolyExampleStyle,
+  "modeling-compound": ModelingCompoundExampleStyle,
+  "neon-punk": NeonPunkExampleStyle,
+  origami: OrigamiExampleStyle,
+  photographic: PhotographicExampleStyle,
+  "pixel-art": PixelArtExampleStyle,
+  "tile-texture": TileTextureExampleStyle,
+  enhance: EnhanceExampleStyle,
+};
 
 type Inputs = {
   prompt: string;
@@ -286,52 +327,74 @@ export default function Create() {
               open={isStylePopoverOpen}
               onOpenChange={setIsStylePopoverOpen}
             >
-              <PopoverTrigger>
-                <div className="absolute h-[3.5rem] w-[4rem] top-3 left-3 border border-border rounded-lg flex flex-col items-center justify-center">
-                  <div className="text-xs font-semibold">
-                    {stylePreset || "None"}
+              <PopoverTrigger asChild>
+                <div className="absolute h-[5rem] w-[5rem] top-3 left-3 border border-border rounded-lg flex flex-col items-center justify-center overflow-hidden cursor-pointer hover:border-primary">
+                  <Image
+                    src={
+                      stylePresetExamples[
+                        stylePreset as keyof typeof stylePresetExamples
+                      ] || stylePresetExamples["none"]
+                    }
+                    alt={`${stylePreset || "None"} Example Style`}
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-background/80 p-1">
+                    <div className="text-xs font-semibold text-center">
+                      {stylePreset === "none" || !stylePreset
+                        ? "None"
+                        : stylePreset === "modeling-compound"
+                        ? "Clay"
+                        : stylePreset
+                            .split("-")
+                            .map(
+                              (word: string) =>
+                                word.charAt(0).toUpperCase() + word.slice(1)
+                            )
+                            .join(" ")}
+                    </div>
                   </div>
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-fit">
+              <PopoverContent className="w-fit h-fit">
                 <ToggleGroup
                   type="single"
                   value={stylePreset}
                   onValueChange={handleStylePresetChange}
-                  className="grid grid-cols-4 gap-2 text-xs"
+                  className="grid grid-cols-3 sm:grid-cols-4 gap-3"
                 >
-                  <ToggleGroupItem
-                    value="none"
-                    aria-label="None"
-                    className="w-[5rem]"
-                  >
-                    None
-                  </ToggleGroupItem>
-                  {[
-                    "3D Model",
-                    "Analog Film",
-                    "Anime",
-                    "Cinematic",
-                    "Comic Book",
-                    "Digital Art",
-                    "Fantasy Art",
-                    "Isometric",
-                    "Line Art",
-                    "Low Poly",
-                    "Modeling Compound",
-                    "Neon Punk",
-                    "Origami",
-                    "Photographic",
-                    "Pixel Art",
-                    "Tile Texture",
-                  ].map((style) => (
+                  {Object.entries(stylePresetExamples).map(([style, image]) => (
                     <ToggleGroupItem
                       key={style}
-                      value={style.toLowerCase().replace(" ", "-")}
+                      value={style}
                       aria-label={style}
-                      className="w-[5rem]"
+                      className={cn(
+                        "w-[5rem] h-[5rem] p-0 relative overflow-hidden",
+                        "hover:border-primary hover:border-2",
+                        "data-[state=on]:border-primary data-[state=on]:border-2"
+                      )}
                     >
-                      {style}
+                      <Image
+                        src={image}
+                        alt={`${style} Example Style`}
+                        width={80}
+                        height={80}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-background/80 p-1">
+                        <div className="text-xs font-semibold text-center">
+                          {style === "modeling-compound"
+                            ? "Clay"
+                            : style
+                                .split("-")
+                                .map(
+                                  (word) =>
+                                    word.charAt(0).toUpperCase() + word.slice(1)
+                                )
+                                .join(" ")}
+                        </div>
+                      </div>
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
@@ -340,9 +403,9 @@ export default function Create() {
 
             <Textarea
               {...register("prompt", { required: "Prompt is required" })}
-              placeholder="Enter prompt"
-              defaultValue="A white camellia flower, lots  of petals in rich pattern. Light shines through the petal patterns, tilted at an angle. Dark background. The soft edges of this flower create beautiful curves, enhancing the overall aesthetic appeal. The background color seamlessly blends with the colors of various flower petals, creating a warm atmosphere."
-              className="w-full text-lg pr-[6rem] pl-[6rem] h-fit"
+              placeholder="Describe your desired image in as descriptive and imaginative a way as possible. Include details like colors, textures, and styles that you want to see in the image. This will help the AI generate an image that is both visually appealing and fits your description."
+              defaultValue=""
+              className="w-full text-lg pr-[6rem] pl-[6.5rem] h-[6.5rem]"
             />
             <div className="flex flex-row w-full justify-between mt-3">
               <div>
