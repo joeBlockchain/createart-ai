@@ -25,8 +25,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "CreateArt AI: AI-Powered Art Creation",
-    description:
-      "Elevate your productivity with intelligent task organization and prioritization",
+    description: "CreateArt AI is a tool for creating AI-generated art.",
     creator: "@CreateArt-AI",
   },
   viewport: "width=device-width, initial-scale=1",

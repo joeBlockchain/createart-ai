@@ -1149,7 +1149,14 @@ function ImageHistory({
               />
             </div>
           ))}
-          {hasMore && <div ref={ref}>Loading more...</div>}
+          {hasMore && (
+            <div
+              ref={ref}
+              className="text-xs text-muted-foreground text-center"
+            >
+              Loading
+            </div>
+          )}
         </div>
       </div>
 
@@ -1164,14 +1171,14 @@ function ImageHistory({
               <ChevronRight className="w-6 h-6 text-muted-foreground" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right">
-            <SheetHeader>
+          <SheetContent side="right" className="w-[8rem]">
+            {/* <SheetHeader>
               <SheetTitle>Generated Images</SheetTitle>
               <SheetDescription>
                 Your previously generated images
               </SheetDescription>
-            </SheetHeader>
-            <div className="flex flex-col items-start gap-2 overflow-y-auto mt-4">
+            </SheetHeader> */}
+            <div className="flex flex-col items-start gap-2 overflow-y-auto mt-4 h-screen mb-[10rem]">
               <div className="grid grid-cols-1 gap-2">
                 {images.map((image) => (
                   <div
@@ -1193,7 +1200,14 @@ function ImageHistory({
                     />
                   </div>
                 ))}
-                {hasMore && <div ref={ref}>Loading more...</div>}
+                {hasMore && (
+                  <div
+                    ref={ref}
+                    className="text-xs text-muted-foreground text-center"
+                  >
+                    Loading
+                  </div>
+                )}
               </div>
             </div>
           </SheetContent>
