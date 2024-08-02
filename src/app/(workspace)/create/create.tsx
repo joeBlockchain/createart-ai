@@ -22,6 +22,7 @@ import {
   Eraser,
   Maximize2,
   ChevronRight,
+  Proportions,
 } from "lucide-react";
 import {
   Popover,
@@ -41,6 +42,15 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { toast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 type Inputs = {
   prompt: string;
@@ -451,7 +461,18 @@ export default function Create() {
           <div className="flex flex-row h-full grow">
             <div className="flex h-full grow overflow-auto">
               {image ? (
-                <ResponsiveImage image={image} aspectRatio={aspectRatio} />
+                <ResponsiveImage
+                  image={image}
+                  aspectRatio={aspectRatio}
+                  prompt={currentPrompt}
+                  stylePreset={stylePreset}
+                  negativePrompt={negativePrompt}
+                  seed={seed ?? 0}
+                  aiImprovePrompt={aiImprovePrompt}
+                  model={model}
+                  setImage={setImage}
+                  setAspectRatio={setAspectRatio}
+                />
               ) : (
                 <AspectRatioPreview
                   aspectRatio={aspectRatio}
@@ -567,16 +588,76 @@ const AspectRatioPreview = ({
   );
 };
 
+const AspectRatioOverlay = ({
+  currentRatio,
+  selectedRatio,
+}: {
+  currentRatio: string;
+  selectedRatio: string | null;
+}) => {
+  if (!selectedRatio || selectedRatio === currentRatio) return null;
+
+  const [currentWidth, currentHeight] = currentRatio.split(":").map(Number);
+  const [selectedWidth, selectedHeight] = selectedRatio.split(":").map(Number);
+
+  const currentAspect = currentWidth / currentHeight;
+  const selectedAspect = selectedWidth / selectedHeight;
+
+  let width, height;
+  if (selectedAspect > currentAspect) {
+    width = "100%";
+    height = `${(currentAspect / selectedAspect) * 100}%`;
+  } else {
+    width = `${(selectedAspect / currentAspect) * 100}%`;
+    height = "100%";
+  }
+
+  return (
+    <div
+      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+      style={{
+        width,
+        height,
+        border: "2px dashed white",
+        boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5)",
+      }}
+    />
+  );
+};
+
 const ResponsiveImage = ({
   image,
   aspectRatio,
+  prompt,
+  stylePreset,
+  negativePrompt,
+  seed,
+  aiImprovePrompt,
+  model,
+  setImage,
+  setAspectRatio,
 }: {
   image: string;
   aspectRatio: string;
+  prompt: string;
+  stylePreset: string;
+  negativePrompt: string;
+  seed: number;
+  aiImprovePrompt: boolean;
+  model: string;
+  setImage: (image: string) => void;
+  setAspectRatio: (aspectRatio: string) => void;
 }) => {
   const [width, height] = aspectRatio.split(":").map(Number);
   const ratio = width / height;
   const [maxSize, setMaxSize] = useState({ width: 0, height: 0 });
+  const [isSearchReplaceDialogOpen, setIsSearchReplaceDialogOpen] =
+    useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [replaceTerm, setReplaceTerm] = useState("");
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     const updateMaxSize = () => {
@@ -595,6 +676,125 @@ const ResponsiveImage = ({
     return () => window.removeEventListener("resize", updateMaxSize);
   }, [ratio]);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isDeletingBG, setIsDeletingBG] = useState(false);
+
+  const handleRemoveBackground = async () => {
+    console.log("Removing background");
+
+    setIsEditing(true);
+    setIsDeletingBG(true);
+    try {
+      const formData = await createFormData(image);
+      const response = await fetch("/api/remove-background", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to remove background");
+      }
+
+      const data = await response.json();
+
+      setImage(data.image);
+
+      toast({
+        title: "Background removed",
+        description: "The image has been updated in your history.",
+      });
+    } catch (error) {
+      console.error("Error removing background:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove background. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEditing(false);
+      setIsDeletingBG(false);
+    }
+  };
+
+  const createFormData = async (imageSource: string): Promise<FormData> => {
+    const formData = new FormData();
+    let imageBlob: Blob;
+
+    if (imageSource.startsWith("data:image")) {
+      // It's a base64 encoded image
+      imageBlob = base64ToBlob(imageSource);
+    } else {
+      // It's a URL, fetch the image first
+      const response = await fetch(imageSource);
+      imageBlob = await response.blob();
+    }
+
+    formData.append("image", imageBlob, "image.png");
+    formData.append("prompt", prompt);
+    formData.append("aspect_ratio", aspectRatio);
+    formData.append("style_preset", stylePreset);
+    formData.append("negative_prompt", negativePrompt);
+    formData.append("seed", seed.toString());
+    formData.append("ai_improve_prompt", aiImprovePrompt.toString());
+    formData.append("model", model);
+
+    console.log(formData);
+
+    return formData;
+  };
+
+  const base64ToBlob = (base64: string): Blob => {
+    const parts = base64.split(";base64,");
+    const contentType = parts[0].split(":")[1];
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+
+    return new Blob([uInt8Array], { type: contentType });
+  };
+
+  const handleSearchReplace = async () => {
+    setIsSearchReplaceDialogOpen(false);
+    setIsEditing(true);
+    setIsSearching(true);
+    try {
+      const formData = await createFormData(image);
+      formData.append("search_prompt", searchTerm);
+      formData.append("replace_prompt", replaceTerm);
+
+      const response = await fetch("/api/search-replace", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to perform search and replace");
+      }
+
+      const data = await response.json();
+      setImage(data.image);
+
+      toast({
+        title: "Search and Replace completed",
+        description: "The image has been updated in your history.",
+      });
+    } catch (error) {
+      console.error("Error performing search and replace:", error);
+      toast({
+        title: "Error",
+        description: "Failed to perform search and replace. Please try again.",
+      });
+    } finally {
+      setIsEditing(false);
+      setIsSearching(false);
+    }
+  };
+
   return (
     <div className="relative w-full h-full flex items-center justify-center p-4">
       <div
@@ -612,38 +812,194 @@ const ResponsiveImage = ({
           layout="fill"
           objectFit="contain"
         />
+        <AspectRatioOverlay
+          currentRatio={aspectRatio}
+          selectedRatio={selectedAspectRatio}
+        />
       </div>
       <div className="absolute top-4 left-4 ">
-        <div className="flex flex-col items-start gap-2">
+        <div className="flex flex-col items-start gap-4">
           <div className="flex flex-row items-center gap-2">
-            <Button variant="outline" size="icon" className="">
-              <ImageOff className="w-6 h-6" strokeWidth={1} />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-12"
+              onClick={handleRemoveBackground}
+              disabled={isEditing}
+            >
+              {isDeletingBG ? (
+                <span
+                  className="loader"
+                  style={
+                    {
+                      "--loader-size": "18px",
+                      "--loader-color": "#000",
+                      "--loader-color-dark": "#fff",
+                    } as React.CSSProperties
+                  }
+                ></span>
+              ) : (
+                <ImageOff className="w-6 h-6 flex-none" strokeWidth={1} />
+              )}
             </Button>
-            <Label className="hidden md:block">Remove Background</Label>
+            <div className="hidden md:flex flex-col items-start gap-2 ">
+              <Label className="">Delete Background</Label>
+              <Badge variant="outline" className="text-muted-foreground">
+                $0.02
+              </Badge>
+            </div>
           </div>
 
           <div className="flex flex-row items-center gap-2">
-            <Button variant="outline" size="icon" className="">
-              <Replace className="w-6 h-6" strokeWidth={1} />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-12"
+              onClick={() => setIsSearchReplaceDialogOpen(true)}
+              disabled={isEditing}
+            >
+              {isSearching ? (
+                <span
+                  className="loader"
+                  style={
+                    {
+                      "--loader-size": "18px",
+                      "--loader-color": "#000",
+                      "--loader-color-dark": "#fff",
+                    } as React.CSSProperties
+                  }
+                ></span>
+              ) : (
+                <Replace className="w-6 h-6" strokeWidth={1} />
+              )}
             </Button>
-            <Label className="hidden md:block">Search and Replace</Label>
+            <div className="hidden md:flex flex-col items-start gap-2 ">
+              <Label className="">Find and Replace</Label>
+              <Badge variant="outline" className="text-muted-foreground">
+                $0.04
+              </Badge>
+            </div>
           </div>
 
-          <div className="flex flex-row items-center gap-2">
+          {/* <div className="flex flex-row items-center gap-2">
             <Button variant="outline" size="icon" className="">
               <Eraser className="w-6 h-6" strokeWidth={1} />
             </Button>
             <Label className="hidden md:block">Erase Object</Label>
-          </div>
+          </div> */}
 
-          <div className="flex flex-row items-center gap-2">
+          {/* <div className="flex flex-row items-center gap-2">
             <Button variant="outline" size="icon" className="">
               <Maximize2 className="w-6 h-6" strokeWidth={1} />
             </Button>
             <Label className="hidden md:block">Outpaint</Label>
-          </div>
+          </div> */}
+
+          {/* <Popover>
+            <PopoverTrigger asChild>
+              <div className="flex flex-row items-center gap-2">
+                <Button variant="outline" size="icon" className="">
+                  <Proportions className="w-6 h-6" strokeWidth={1} />
+                </Button>
+                <Label className="hidden md:block">Aspect Ratio</Label>
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-fit h-fit">
+              <ToggleGroup
+                type="single"
+                className="w-fit grid grid-cols-3 text-muted-foreground"
+                value={selectedAspectRatio || aspectRatio}
+                onValueChange={setSelectedAspectRatio}
+              >
+                <ToggleGroupItem value="21:9" aria-label="21:9">
+                  21:9
+                </ToggleGroupItem>
+                <ToggleGroupItem value="16:9" aria-label="16:9">
+                  16:9
+                </ToggleGroupItem>
+                <ToggleGroupItem value="3:2" aria-label="3:2">
+                  3:2
+                </ToggleGroupItem>
+
+                <ToggleGroupItem value="4:3" aria-label="4:3">
+                  4:3
+                </ToggleGroupItem>
+                <ToggleGroupItem value="5:4" aria-label="5:4">
+                  5:4
+                </ToggleGroupItem>
+                <ToggleGroupItem value="1:1" aria-label="1:1">
+                  1:1
+                </ToggleGroupItem>
+                <ToggleGroupItem value="4:5" aria-label="4:5">
+                  4:5
+                </ToggleGroupItem>
+
+                <ToggleGroupItem value="2:3" aria-label="2:3">
+                  2:3
+                </ToggleGroupItem>
+
+                <ToggleGroupItem value="9:16" aria-label="9:16">
+                  9:16
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <div className="mt-3 flex w-full justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedAspectRatio) {
+                      setAspectRatio(selectedAspectRatio);
+                      setSelectedAspectRatio(null);
+                    }
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover> */}
         </div>
       </div>
+      <Dialog
+        open={isSearchReplaceDialogOpen}
+        onOpenChange={setIsSearchReplaceDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Search and Replace</DialogTitle>
+            <DialogDescription>
+              Enter the terms to search for and replace in the image.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="search" className="text-right">
+                Search for
+              </Label>
+              <Input
+                id="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="replace" className="text-right">
+                Replace with
+              </Label>
+              <Input
+                id="replace"
+                value={replaceTerm}
+                onChange={(e) => setReplaceTerm(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSearchReplace}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

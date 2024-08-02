@@ -13,8 +13,8 @@ export default function SiteHeader() {
           className="flex mr-6 text-primary items-center"
           prefetch={false}
         >
-          <Image className="h-6 w-6" />
-          <span className="hidden md:block ml-4 font-semibold text-base sm:text-lg">
+          <Image className="h-6 w-6 text-muted-foreground md:text-primary" />
+          <span className="hidden md:block ml-4 font-semibold text-base sm:text-lg ">
             CreateArt-AI
           </span>
         </Link>
