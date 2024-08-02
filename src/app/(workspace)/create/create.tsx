@@ -123,7 +123,7 @@ interface GeneratedImage {
 
 export default function Create() {
   const [currentPrompt, setCurrentPrompt] = useState("");
-  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [aspectRatio, setAspectRatio] = useState("5:4");
   const [stylePreset, setStylePreset] = useState("cinematic");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [seed, setSeed] = useState<number | null>(null);
@@ -544,7 +544,7 @@ export default function Create() {
               )}
               {error && <p className="text-red-500">{error}</p>}
             </div>
-            <div className="max-h-[80vh] overflow-y-auto">
+            <div className="h-[70vh] overflow-y-auto">
               <ImageHistory onImageSelect={handleImageSelect} />
             </div>
           </div>
@@ -907,7 +907,7 @@ const ResponsiveImage = ({
             </Button>
             <div className="hidden md:flex flex-col items-start gap-2 ">
               <Label className="">Delete Background</Label>
-              <Badge variant="outline" className="text-muted-foreground">
+              <Badge variant="outline" className="bg-background/70">
                 $0.02
               </Badge>
             </div>
@@ -938,7 +938,7 @@ const ResponsiveImage = ({
             </Button>
             <div className="hidden md:flex flex-col items-start gap-2 ">
               <Label className="">Find and Replace</Label>
-              <Badge variant="outline" className="text-muted-foreground">
+              <Badge variant="outline" className="bg-background/70">
                 $0.04
               </Badge>
             </div>
@@ -1178,7 +1178,7 @@ function ImageHistory({
                 Your previously generated images
               </SheetDescription>
             </SheetHeader> */}
-            <div className="flex flex-col items-start gap-2 overflow-y-auto mt-4 h-screen mb-[10rem]">
+            <div className="flex flex-col items-start gap-2 overflow-y-auto mt-4 h-[94vh]">
               <div className="grid grid-cols-1 gap-2">
                 {images.map((image) => (
                   <div

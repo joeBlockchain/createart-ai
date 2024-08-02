@@ -37,7 +37,7 @@ export default async function Home() {
                 variant="outline"
                 className="mx-3 w-40 text-lg h-12 lg:h-14 lg:rounded-xl lg:text-xl"
               >
-                <Link href="/login">Learn More</Link>
+                <Link href="/how-to-get-started">Learn More</Link>
               </Button>
             </div>
           </div>
