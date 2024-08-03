@@ -23,7 +23,7 @@ export default function SiteHeader() {
             <div className="hidden sm:block space-x-2 md:space-x-2">
               <Button asChild variant="ghost" size="icon" className="h-9 w-9">
                 <Link
-                  href="https://github.com/joeBlockchain"
+                  href="https://github.com/joeBlockchain/createart-ai"
                   prefetch={false}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -44,7 +44,7 @@ export default function SiteHeader() {
               </Button>
               <Button asChild variant="ghost" size="icon" className="h-9 w-9">
                 <Link
-                  href="https://twitter.com/JoeTaylor_86753"
+                  href="https://twitter.com/JoeTaylor_86753/status/1819535549335851217"
                   prefetch={false}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -65,7 +65,7 @@ export default function SiteHeader() {
               </Button>
               <Button asChild variant="ghost" size="icon" className="h-9 w-9">
                 <Link
-                  href="https://medium.com/@learningsomethingnew"
+                  href="https://medium.com/@learningsomethingnew/building-your-own-ai-image-generator-utilizing-stability-ai-endpoints-e0b968feba1b"
                   prefetch={false}
                   target="_blank"
                   rel="noopener noreferrer"
